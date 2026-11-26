@@ -1,0 +1,25 @@
+From cc5ca9f62a9e6fe30efddccbfc2dbb1c3feb677e Mon Sep 17 00:00:00 2001
+From: lionelpnt <lionelpnt@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 16:31:24 +0100
+Subject: [PATCH] treble: disable 60Hz game cap and raise SF touch timer to
+ 800ms
+
+---
+ system.prop | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/system.prop b/system.prop
+index 41a0688..39f9dc4 100644
+--- a/system.prop
++++ b/system.prop
+@@ -69,3 +69,7 @@ dalvik.vm.heapsize?=512m
+ # state and composition stalls.  disabling it restores QPR0 behaviour
+ # where synthetic vsync keeps composition alive as a fallback.
+ debug.sf.no_vsyncs_on_screen_off=false
++
++# Disable 60 Hz default frame-rate cap on games and extend SurfaceFlinger touch timer
++persist.graphics.game_default_frame_rate.enabled=false
++ro.surface_flinger.set_touch_timer_ms=800
+-- 
+2.53.0
+

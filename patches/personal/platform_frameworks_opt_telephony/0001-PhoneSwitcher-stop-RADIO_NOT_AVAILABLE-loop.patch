@@ -1,0 +1,36 @@
+From b91cc83d476bd99fddc2074e0c860d7f32d38706 Mon Sep 17 00:00:00 2001
+From: lionelpnt <lionelpnt@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 15:13:55 +0100
+Subject: [PATCH] PhoneSwitcher: avoid infinite RADIO_NOT_AVAILABLE loop on
+ noril/HAL_COMMAND_ALLOW_DATA
+
+Change-Id: I6a828f824ae05776bd4d209966feec6e9210e4d6
+---
+ .../internal/telephony/data/PhoneSwitcher.java        | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/java/com/android/internal/telephony/data/PhoneSwitcher.java b/src/java/com/android/internal/telephony/data/PhoneSwitcher.java
+index 6d2e77d..1b0735e 100644
+--- a/src/java/com/android/internal/telephony/data/PhoneSwitcher.java
++++ b/src/java/com/android/internal/telephony/data/PhoneSwitcher.java
+@@ -1915,9 +1915,14 @@ public class PhoneSwitcher extends Handler {
+                     logl("onDdsSwitchResponse: Wait for SIM to get READY");
+                     return;
+                 } else if (error == CommandException.Error.RADIO_NOT_AVAILABLE) {
+-                    logl("onDdsSwitchResponse: Falling back to HAL_COMMAND_ALLOW_DATA");
+-                    mHalCommandToUse = HAL_COMMAND_ALLOW_DATA;
+-                    sendRilCommands(phoneId);
++                    if (mHalCommandToUse != HAL_COMMAND_ALLOW_DATA
++                            && !android.os.SystemProperties.get("ro.radio.noril", "").equals("yes")) {
++                        logl("onDdsSwitchResponse: Falling back to HAL_COMMAND_ALLOW_DATA");
++                        mHalCommandToUse = HAL_COMMAND_ALLOW_DATA;
++                        sendRilCommands(phoneId);
++                    } else {
++                        logl("onDdsSwitchResponse: Radio not available, stopping retry loop");
++                    }
+                     return;
+                 }
+             }
+-- 
+2.53.0
+
