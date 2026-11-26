@@ -1,0 +1,26 @@
+From b3a4f9aff7a8bf7e9b93a2ce52ced681f8b343a8 Mon Sep 17 00:00:00 2001
+From: lionelpnt <lionelpnt@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 19:08:31 +0100
+Subject: [PATCH] sepolicy: drop gatekeeper_vendor_data_file rules removed from
+ private sepolicy in A17
+
+---
+ sepolicy/samsung.te | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/sepolicy/samsung.te b/sepolicy/samsung.te
+index 933c28e..1a9ea75 100644
+--- a/sepolicy/samsung.te
++++ b/sepolicy/samsung.te
+@@ -26,8 +26,6 @@ allow hal_usb_default system_prop:file { getattr map open read };
+ # (without this, PIN/password verification fails with error -506 because
+ # the gatekeeper HAL cannot load or save its brute-force throttling records;
+ # gatekeeper_vendor_data_file is already declared in system/sepolicy/private/file.te)
+-allow tee gatekeeper_vendor_data_file:dir { add_name open read remove_name search write };
+-allow tee gatekeeper_vendor_data_file:file { create getattr open read setattr unlink write };
+ 
+ type sf_hs_mode_prop, property_type;
+ 
+-- 
+2.53.0
+

@@ -1,4 +1,4 @@
-From b22409d74e82297a56009ce2886abf545bbf51ce Mon Sep 17 00:00:00 2001
+From 44cdbc0e743362bde20eecfd0c1062a2576d1961 Mon Sep 17 00:00:00 2001
 From: dozeoff <dozeoff@dozeoff>
 Date: Sun, 10 May 2026 23:54:28 +0000
 Subject: [PATCH] net: Gracefully fallback when eBPF firewall/maps are
@@ -56,16 +56,18 @@ Additional changes for RestlessOS:
   patch is kept intact -- per-map try/catch in NetworkStatsService,
   Log.wtf() -> Log.e() for map open failures, and null guards in
   SkDestroyListener.
+
+Change-Id: Id2e751e1c14b63bfa6a675c6766bf44a7fdf0a73
 ---
- .../src/android/net/BpfNetMapsUtils.java      | 18 +++++---
- .../server/net/NetworkStatsService.java       | 46 +++++++++++++++----
- 2 files changed, 50 insertions(+), 14 deletions(-)
+ .../src/android/net/BpfNetMapsUtils.java      | 18 ++++--
+ .../server/net/NetworkStatsService.java       | 64 +++++++++++++++----
+ 2 files changed, 65 insertions(+), 17 deletions(-)
 
 diff --git a/framework/src/android/net/BpfNetMapsUtils.java b/framework/src/android/net/BpfNetMapsUtils.java
-index 287116a..9a8d416 100644
+index 7673ed8..5ba1cc9 100644
 --- a/framework/src/android/net/BpfNetMapsUtils.java
 +++ b/framework/src/android/net/BpfNetMapsUtils.java
-@@ -220,8 +220,10 @@ public class BpfNetMapsUtils {
+@@ -218,8 +218,10 @@ public class BpfNetMapsUtils {
              final U32 config = configurationMap.getValue(UID_RULES_CONFIGURATION_KEY);
              return (config.val & match) != 0;
          } catch (ErrnoException e) {
@@ -78,7 +80,7 @@ index 287116a..9a8d416 100644
          }
      }
  
-@@ -249,8 +251,10 @@ public class BpfNetMapsUtils {
+@@ -245,8 +247,10 @@ public class BpfNetMapsUtils {
              final boolean isMatchEnabled = uidMatch != null && (uidMatch.rule & match) != 0;
              return isMatchEnabled == isAllowList ? FIREWALL_RULE_ALLOW : FIREWALL_RULE_DENY;
          } catch (ErrnoException e) {
@@ -91,7 +93,7 @@ index 287116a..9a8d416 100644
          }
      }
  
-@@ -374,8 +378,10 @@ public class BpfNetMapsUtils {
+@@ -367,8 +371,10 @@ public class BpfNetMapsUtils {
          try {
              return dataSaverEnabledMap.getValue(DATA_SAVER_ENABLED_KEY).val == DATA_SAVER_ENABLED;
          } catch (ErrnoException e) {
@@ -105,71 +107,78 @@ index 287116a..9a8d416 100644
      }
  }
 diff --git a/service-t/src/com/android/server/net/NetworkStatsService.java b/service-t/src/com/android/server/net/NetworkStatsService.java
-index 1553bff..365aed4 100644
+index 0a26536..1f1cb84 100644
 --- a/service-t/src/com/android/server/net/NetworkStatsService.java
 +++ b/service-t/src/com/android/server/net/NetworkStatsService.java
-@@ -678,13 +678,38 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -680,12 +680,53 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+                 mNetworkStatsSubscriptionsMonitor);
+         mLocationPermissionChecker = mDeps.makeLocationPermissionChecker(mContext);
          mInterfaceMapHelper = mDeps.makeBpfInterfaceMapHelper();
-         try {
-             mUidCounterSetMap = mDeps.getUidCounterSetMap();
+-        mUidCounterSetMap = mDeps.getUidCounterSetMap();
+-        mCookieTagMap = mDeps.getCookieTagMap();
+-        mStatsMapA = mDeps.getStatsMapA();
+-        mStatsMapB = mDeps.getStatsMapB();
+-        mAppUidStatsMap = mDeps.getAppUidStatsMap();
+-        mIfaceStatsMap = mDeps.getIfaceStatsMap();
++        IBpfMap<S32, U8> uidCounterSetMap = null;
++        try {
++            uidCounterSetMap = mDeps.getUidCounterSetMap();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "UidCounterSetMap unavailable", t);
 +        }
++        mUidCounterSetMap = uidCounterSetMap;
 +
++        IBpfMap<S64, CookieTagMapValue> cookieTagMap = null;
 +        try {
-             mCookieTagMap = mDeps.getCookieTagMap();
++            cookieTagMap = mDeps.getCookieTagMap();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "CookieTagMap unavailable", t);
 +        }
++        mCookieTagMap = cookieTagMap;
 +
++        IBpfMap<StatsMapKey, StatsMapValue> statsMapA = null;
 +        try {
-             mStatsMapA = mDeps.getStatsMapA();
++            statsMapA = mDeps.getStatsMapA();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "StatsMapA unavailable", t);
 +        }
++        mStatsMapA = statsMapA;
 +
++        IBpfMap<StatsMapKey, StatsMapValue> statsMapB = null;
 +        try {
-             mStatsMapB = mDeps.getStatsMapB();
++            statsMapB = mDeps.getStatsMapB();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "StatsMapB unavailable", t);
 +        }
++        mStatsMapB = statsMapB;
 +
++        IBpfMap<S32, StatsMapValue> appUidStatsMap = null;
 +        try {
-             mAppUidStatsMap = mDeps.getAppUidStatsMap();
++            appUidStatsMap = mDeps.getAppUidStatsMap();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "AppUidStatsMap unavailable", t);
 +        }
++        mAppUidStatsMap = appUidStatsMap;
 +
++        IBpfMap<S32, StatsMapValue> ifaceStatsMap = null;
 +        try {
-             mIfaceStatsMap = mDeps.getIfaceStatsMap();
--        } catch(Throwable t) {
--            android.util.Log.e("PHH", "Failed creating bpf maps", t);
++            ifaceStatsMap = mDeps.getIfaceStatsMap();
 +        } catch (Throwable t) {
 +            android.util.Log.e("PHH", "IfaceStatsMap unavailable", t);
-         }
++        }
++        mIfaceStatsMap = ifaceStatsMap;
          // To prevent any possible races, the flag is not allowed to change until rebooting.
          mSupportEventLogger = mDeps.supportEventLogger(mContext);
-@@ -702,13 +727,18 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+         mStoreTransportTypes =
+@@ -702,6 +743,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                  mDeps.enabledBroadcastNetworkStatsUpdatedRateLimiting(mContext);
  
          mSkDestroyListener = mDeps.makeSkDestroyListener((message) -> {
 +            if (mCookieTagMap == null) return;
-+
              final StructInetDiagSockId sockId = message.inetDiagMsg.id;
-+
              try {
                  mCookieTagMap.deleteEntry(new S64(sockId.cookie));
-             } catch (ErrnoException e) {
--                Log.e(TAG, "Failed to delete CookieTagMap entry for " + sockId.cookie  + ": " + e);
-+                Log.e(TAG, "Failed to delete CookieTagMap entry for "
-+                        + sockId.cookie + ": " + e);
-             }
-         }, mHandler);
-+
-         mHandler.post(mSkDestroyListener::start);
-     }
- 
-@@ -868,7 +898,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -868,7 +910,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
              try {
                  return new BpfMap<>(UID_COUNTERSET_MAP_PATH, S32.class, U8.class);
              } catch (ErrnoException e) {
@@ -178,7 +187,7 @@ index 1553bff..365aed4 100644
                  return null;
              }
          }
-@@ -879,7 +909,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -879,7 +921,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                  return new BpfMap<>(COOKIE_TAG_MAP_PATH,
                          S64.class, CookieTagMapValue.class);
              } catch (ErrnoException e) {
@@ -187,7 +196,7 @@ index 1553bff..365aed4 100644
                  return null;
              }
          }
-@@ -889,7 +919,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -889,7 +931,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
              try {
                  return new BpfMap<>(STATS_MAP_A_PATH, StatsMapKey.class, StatsMapValue.class);
              } catch (ErrnoException e) {
@@ -196,7 +205,7 @@ index 1553bff..365aed4 100644
                  return null;
              }
          }
-@@ -899,7 +929,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -899,7 +941,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
              try {
                  return new BpfMap<>(STATS_MAP_B_PATH, StatsMapKey.class, StatsMapValue.class);
              } catch (ErrnoException e) {
@@ -205,7 +214,7 @@ index 1553bff..365aed4 100644
                  return null;
              }
          }
-@@ -910,7 +940,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
+@@ -910,7 +952,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                  return new BpfMap<>(APP_UID_STATS_MAP_PATH,
                          S32.class, StatsMapValue.class);
              } catch (ErrnoException e) {

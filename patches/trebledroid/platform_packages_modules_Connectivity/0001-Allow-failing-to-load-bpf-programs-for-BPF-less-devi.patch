@@ -19,11 +19,11 @@ index 680c05eb00..d4dfdca701 100644
 -    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS));
 -    RETURN_IF_NOT_OK(attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS));
 +    auto ret = attachProgramToCgroup(BPF_EGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_EGRESS);
-+    if (!isOk(ret)) {
++    if (!ret.ok()) {
 +        ALOGE("Failed loading egress program");
 +    }
 +    auto ret2 = attachProgramToCgroup(BPF_INGRESS_PROG_PATH, cg_fd, BPF_CGROUP_INET_INGRESS);
-+    if (!isOk(ret)) {
++    if (!ret2.ok()) {
 +        ALOGE("Failed loading ingress program");
 +    }
 

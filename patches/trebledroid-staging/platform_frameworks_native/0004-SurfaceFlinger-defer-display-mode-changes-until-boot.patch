@@ -1,7 +1,7 @@
-From 16d17669fd40fba73cf71cd6182216d19284e459 Mon Sep 17 00:00:00 2001
+From 667afb9e32b9398397068d217c36f20915244d61 Mon Sep 17 00:00:00 2001
 From: "Christopher A. Williamson" <contact@chrisaw.io>
 Date: Sat, 21 Mar 2026 23:02:19 +0000
-Subject: [PATCH 04/7] SurfaceFlinger: defer display mode changes until boot is
+Subject: [PATCH] SurfaceFlinger: defer display mode changes until boot is
  finished
 
 The upstream boot guard in initiateDisplayModeChanges is gated on the
@@ -23,30 +23,27 @@ first.
 Remove the flag gate so mode changes are unconditionally deferred until
 mBootStage == FINISHED. DisplayManager re-requests the preferred mode
 once boot completes and the pipeline is stable.
+
+Change-Id: I89a5f63fa9847971947991bd49c83cb0813e2f15
 ---
- services/surfaceflinger/SurfaceFlinger.cpp | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ services/surfaceflinger/SurfaceFlinger.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
-index 6965cf9a11..145e4b8c52 100644
+index 9128394..c5dbefc 100644
 --- a/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/services/surfaceflinger/SurfaceFlinger.cpp
-@@ -1651,8 +1651,13 @@ void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
- }
-
+@@ -1633,6 +1633,10 @@ void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
  void SurfaceFlinger::initiateDisplayModeChanges() {
--    if (FlagManager::getInstance().synced_resolution_switch() && mBootStage != BootStage::FINISHED)
--            [[unlikely]] {
-+    // [GSI] Unconditionally defer ALL display mode changes until boot is finished.
-+    // The upstream guard is gated on synced_resolution_switch, which defaults to false
-+    // on AP4A, making it a no-op. On GSI targets with multi-rate displays (e.g. garnet
-+    // 60/90/120 Hz), persisted mode state from a previous boot can cause SF to request
-+    // a mode change on the very first frame. Qualcomm's DSI driver rejects DMS (dynamic
-+    // mode switch) before the first frame is committed, producing graphical corruption.
+     SFTRACE_CALL();
+ 
 +    if (mBootStage != BootStage::FINISHED) [[unlikely]] {
-         return;
-     }
-
++        return;
++    }
++
+     std::vector<PhysicalDisplayId> processedDisplayIds;
+     const bool supportsMultiDisplay = FlagManager::getInstance().modeset_multi_display() &&
+             FlagManager::getInstance().modeset_state_machine() &&
 -- 
 2.53.0
 

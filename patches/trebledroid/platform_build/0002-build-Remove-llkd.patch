@@ -1,7 +1,7 @@
-From f1ef1867a6ac2c5503ccba52d504b04c7ca2a9f9 Mon Sep 17 00:00:00 2001
+From bb137909fdba4c1f2995ff1daf974ba25128f165 Mon Sep 17 00:00:00 2001
 From: Andy CrossGate Yan <GeForce8800Ultra@gmail.com>
 Date: Thu, 14 Oct 2021 12:20:52 +0000
-Subject: [PATCH 2/3] build: Remove llkd
+Subject: [PATCH] build: Remove llkd
 
 ...until someone figures out why Genshin Impact fails it
 
@@ -11,17 +11,17 @@ Change-Id: I29384a820a0c07b29d3f11d7039bed40eeaee926
  1 file changed, 1 deletion(-)
 
 diff --git a/target/product/base_system.mk b/target/product/base_system.mk
-index 5c4ef33284..cb1b32a7fe 100644
+index 88aed43..b84747b 100644
 --- a/target/product/base_system.mk
 +++ b/target/product/base_system.mk
-@@ -211,7 +211,6 @@ PRODUCT_PACKAGES += \
+@@ -219,7 +219,6 @@ PRODUCT_PACKAGES += \
+     libvintf_jni \
      libvulkan \
      libwilhelm \
-     linker \
 -    llkd \
      llndk_libs \
      lmkd \
      LocalTransport \
 -- 
-2.52.0
+2.53.0
 

@@ -1,19 +1,21 @@
-From 69a1b8f3474056d15367d6259fd96ce456e16885 Mon Sep 17 00:00:00 2001
+From 20a4a3e55c496dbcc10b249f28b0cb0931e2be54 Mon Sep 17 00:00:00 2001
 From: Pierre-Hugues Husson <phh@phh.me>
 Date: Wed, 18 Oct 2023 16:53:40 -0400
-Subject: [PATCH 39/51] Ignore cgroup creation errors
+Subject: [PATCH] Ignore cgroup creation errors
 
 For old kernels who don't have those modern cgroups
+
+Change-Id: I1ab6a7781cb3788641c00191d47734c646a0c2dd
 ---
- core/jni/com_android_internal_os_Zygote.cpp               | 2 ++
- services/core/java/com/android/server/am/ProcessList.java | 5 -----
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ core/jni/com_android_internal_os_Zygote.cpp          |  2 ++
+ .../core/java/com/android/server/am/ProcessList.java | 12 ++++--------
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/core/jni/com_android_internal_os_Zygote.cpp b/core/jni/com_android_internal_os_Zygote.cpp
-index ac0ca27c8..1ce78eca2 100644
+index 15a7ee4a0..7f71adb8c 100644
 --- a/core/jni/com_android_internal_os_Zygote.cpp
 +++ b/core/jni/com_android_internal_os_Zygote.cpp
-@@ -1996,10 +1996,12 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
+@@ -1985,10 +1985,12 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids,
      if (getuid() == 0) {
          const int rc = createProcessGroup(uid, getpid());
          if (rc != 0) {
@@ -24,27 +26,31 @@ index ac0ca27c8..1ce78eca2 100644
                                                  /* pid= */ 0, strerror(-rc)));
 +#endif
          }
-
-         if (is_system_server && UsePerAppMemcg()) {
+ 
+         if (is_system_server) {
 diff --git a/services/core/java/com/android/server/am/ProcessList.java b/services/core/java/com/android/server/am/ProcessList.java
-index 1a12925d4..6722d7981 100644
+index d8e2cfaae..d098982b7 100644
 --- a/services/core/java/com/android/server/am/ProcessList.java
 +++ b/services/core/java/com/android/server/am/ProcessList.java
-@@ -2663,14 +2663,9 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
+@@ -2688,14 +2688,10 @@ public final class ProcessList extends ProcessListInternal
                          // If we're not told to skip the process group creation, go create it.
                          final int res = Process.createProcessGroup(uid, startResult.pid);
                          if (res < 0) {
+-                            String errorStr = "Unable to create process group for "
+-                                + app.processName + " (uid: " + uid + ", pid: " + startResult.pid
+-                                + "), errno: " + res;
 -                            if (res == -OsConstants.ESRCH) {
-                                 Slog.e(ActivityManagerService.TAG,
-                                         "Unable to create process group for "
-                                         + app.processName + " (" + startResult.pid + ")");
+-                                Slog.e(ActivityManagerService.TAG, errorStr);
 -                            } else {
--                                throw new AssertionError("Unable to create process group for "
--                                    + app.processName + " (" + startResult.pid + ")");
+-                                throw new AssertionError(errorStr);
 -                            }
++                            Slog.e(ActivityManagerService.TAG,
++                                    "Unable to create process group for "
++                                    + app.processName + " (uid: " + uid + ", pid: " + startResult.pid
++                                    + "), errno: " + res);
                          } else {
                              app.mProcessGroupCreated = true;
                          }
 -- 
-2.52.0
+2.53.0
 

@@ -1,17 +1,18 @@
-From 6ff989369abcf5372085fa35f3b1339691d778fd Mon Sep 17 00:00:00 2001
+From 88d42e6b9834a57641798a5dc67d4e7e87f65da7 Mon Sep 17 00:00:00 2001
 From: Pierre-Hugues Husson <phh@phh.me>
 Date: Sat, 19 Feb 2022 08:20:25 -0500
-Subject: [PATCH 2/2] Add new mechanism to fake vendor props on a per-process
- basis
+Subject: [PATCH] Add new mechanism to fake vendor props on a per-process basis
 
 This reads debug.phh.props.<process name>. If its value is "vendor",
 then ro.product.device/ro.product.manufacturer is read from vendor
+
+Change-Id: Iaab0142793b6d3cfcf51c9e56487767e159abf24
 ---
- libc/system_properties/system_properties.cpp | 94 +++++++++++++++++++-
- 1 file changed, 92 insertions(+), 2 deletions(-)
+ libc/system_properties/system_properties.cpp | 92 +++++++++++++++++++-
+ 1 file changed, 88 insertions(+), 4 deletions(-)
 
 diff --git a/libc/system_properties/system_properties.cpp b/libc/system_properties/system_properties.cpp
-index e0d38a822..60974e8ae 100644
+index ca286e8..3780da3 100644
 --- a/libc/system_properties/system_properties.cpp
 +++ b/libc/system_properties/system_properties.cpp
 @@ -36,6 +36,8 @@
@@ -20,19 +21,18 @@ index e0d38a822..60974e8ae 100644
  #include <unistd.h>
 +#include <string.h>
 +#include <fcntl.h>
-
+ 
  #include <new>
-
-@@ -53,6 +55,85 @@
- #define SERIAL_VALUE_LEN(serial) ((serial) >> 24)
+ 
+@@ -54,6 +56,76 @@
  #define APPCOMPAT_PREFIX "ro.appcompat_override."
-
+ #define APPCOMPAT_OVERRIDE_ENV_VAR "BIONIC_APPCOMPAT_OVERRIDE"
+ 
 +static char comm[128];
 +static bool self_ok = false;
 +static char comm_override[PROP_VALUE_MAX];
 +
 +static void read_self() {
-+  //NB: Not atomic, but should be good enough, there is no possible corruption from concurrency
 +  if(self_ok) return;
 +  self_ok = true;
 +
@@ -45,36 +45,28 @@ index e0d38a822..60974e8ae 100644
 +      cmdline[i] = 0;
 +  close(fd);
 +
-+  // Truncate to last /, we don't want `/` in the prop
 +  const char *c = strrchr(cmdline, '/');
 +  if (c != nullptr) {
 +      c = c+1;
 +  } else {
 +      c = cmdline;
 +  }
-+  // Take only the last 16 bytes (prop names max is 32)
 +  if(strlen(c) < 15) {
 +      strcpy(comm, c);
 +  } else {
 +      strcpy(comm, c + strlen(c) - 15);
 +  }
 +
-+
-+  //That's calling ourselves but that's fine because we already have self_ok = true
 +  char propName[PROP_NAME_MAX];
 +  memset(propName, 0, PROP_NAME_MAX);
 +  strncpy(propName, "debug.phh.props.", PROP_NAME_MAX - 1);
 +  strncat(propName, comm, PROP_NAME_MAX - strlen(propName) - 1);
 +
-+  //async_safe_format_log(ANDROID_LOG_WARN, "libc", "Reading debug prop %s", propName);
 +  __system_property_get(propName, comm_override);
 +}
 +
 +static const char* redirectToProp(const char *name) {
 +  read_self();
-+  /*if(strstr(name, "ro.keymaster") != nullptr || strstr(name, "security_patch") != nullptr || strstr(name, "release") != nullptr) {
-+    async_safe_format_log(ANDROID_LOG_WARN, "libc", "Process/comm %s/%s is reading %s", comm, comm_override, name);
-+  }*/
 +  if(strcmp(comm_override, "vendor") == 0) {
 +    if(strcmp(name, "ro.product.device") == 0) {
 +      return "ro.product.vendor.device";
@@ -109,35 +101,54 @@ index e0d38a822..60974e8ae 100644
  static bool is_dir(const char* pathname) {
    struct stat info;
    if (stat(pathname, &info) == -1) {
-@@ -160,17 +241,26 @@ uint32_t SystemProperties::AreaSerial() {
+@@ -166,6 +238,8 @@ uint32_t SystemProperties::AreaSerial() {
  }
-
+ 
  const prop_info* SystemProperties::Find(const char* name) {
 +  const char* newName = redirectToProp(name);
 +
    if (!initialized_) {
      return nullptr;
    }
-
+@@ -173,10 +247,10 @@ const prop_info* SystemProperties::Find(const char* name) {
+   // if appcompat override is enabled, we first try finding APPCOMPAT_PREFIXed system
+   // property
+   if (use_appcompat_override_) {
+-    const size_t totalLength = strlen(APPCOMPAT_PREFIX) + strlen(name) + 1;
++    const size_t totalLength = strlen(APPCOMPAT_PREFIX) + strlen(newName) + 1;
+     char overrideName[totalLength];
+ 
+-    snprintf(overrideName, totalLength, "%s%s", APPCOMPAT_PREFIX, name);
++    snprintf(overrideName, totalLength, "%s%s", APPCOMPAT_PREFIX, newName);
+ 
+     prop_area* pa = contexts_->GetPropAreaForName(overrideName);
+     if (pa) {
+@@ -187,13 +261,23 @@ const prop_info* SystemProperties::Find(const char* name) {
+     }
+   }
+ 
 -  prop_area* pa = contexts_->GetPropAreaForName(name);
 +  prop_area* pa = contexts_->GetPropAreaForName(newName);
    if (!pa) {
      async_safe_format_log(ANDROID_LOG_WARN, "libc", "Access denied finding property \"%s\"", name);
      return nullptr;
    }
-
+ 
 -  return pa->find(name);
 +  const prop_info* pi = pa->find(newName);
-+  if (pi == nullptr && newName != name) {
++  if (pi != nullptr) {
++    return pi;
++  }
++  if (newName != name) {
 +    pa = contexts_->GetPropAreaForName(name);
 +    if (pa) {
-+      pi = pa->find(name);
++      return pa->find(name);
 +    }
 +  }
-+  return pi;
++  return nullptr;
  }
-
+ 
  static bool is_appcompat_override(const char* name) {
 -- 
-2.52.0
+2.53.0
 

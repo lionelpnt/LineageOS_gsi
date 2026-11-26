@@ -1,0 +1,32 @@
+From d6091cec0be1258d589ffc182090d85fde6eb430 Mon Sep 17 00:00:00 2001
+From: lionelpnt <lionelpnt@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 09:54:41 +0100
+Subject: [PATCH] base: drop sysbta bluetooth audio service for A17
+
+---
+ base.mk | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/base.mk b/base.mk
+index 31be9b9..9c71bc7 100644
+--- a/base.mk
++++ b/base.mk
+@@ -11,7 +11,6 @@ PRODUCT_COPY_FILES := \
+ # Bluetooth Audio (System-side HAL, sysbta)
+ PRODUCT_PACKAGES += \
+     audio.sysbta.default \
+-    android.hardware.bluetooth.audio-service-system
+ 
+ PRODUCT_COPY_FILES += \
+     device/phh/treble/bluetooth/audio/config/sysbta_audio_policy_configuration.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysbta_audio_policy_configuration.xml \
+@@ -140,7 +139,6 @@ PRODUCT_PACKAGES += \
+     NoCutoutOverlay
+ 
+ PRODUCT_PACKAGES += \
+-    lightsctl \
+     lightsctl-aidl \
+     uevent
+ 
+-- 
+2.53.0
+

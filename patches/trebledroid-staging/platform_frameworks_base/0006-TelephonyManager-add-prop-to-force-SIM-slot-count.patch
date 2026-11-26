@@ -1,7 +1,7 @@
-From 9da044d55d72eaa0c802855e4ac83597fbff42f8 Mon Sep 17 00:00:00 2001
+From 5f469f546c90fec47921561151c585c4d2f5be92 Mon Sep 17 00:00:00 2001
 From: "Christopher A. Williamson" <contact@chrisaw.io>
 Date: Mon, 16 Feb 2026 09:44:47 +0000
-Subject: [PATCH 6/15] TelephonyManager: add prop to force SIM slot count
+Subject: [PATCH] TelephonyManager: add prop to force SIM slot count
 
 Some devices report an incorrect number of SIM slots, causing dual-SIM
 functionality to be unavailable. Add persist.sys.phh.sim_slots property
@@ -11,31 +11,17 @@ getActiveModemCount(), and getSupportedModemCount().
 Setting persist.sys.phh.sim_slots=2 forces DSDS mode, =3 forces TSTS,
 =0 or =1 forces single-SIM. When unset (-1), the default behavior is
 preserved.
+
+Change-Id: Ibd426045067a3314eb7b7aebeb405c9d45e47e9b
 ---
- .../android/telephony/TelephonyManager.java   | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ telephony/java/android/telephony/TelephonyManager.java | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/telephony/java/android/telephony/TelephonyManager.java b/telephony/java/android/telephony/TelephonyManager.java
-index 0e7f8400b..c30bc065c 100644
+index c9544b257..c74ac6b82 100644
 --- a/telephony/java/android/telephony/TelephonyManager.java
 +++ b/telephony/java/android/telephony/TelephonyManager.java
-@@ -648,6 +648,15 @@ public class TelephonyManager {
-     /** @hide */
-     @UnsupportedAppUsage
-     public MultiSimVariants getMultiSimConfiguration() {
-+        int simSlots = SystemProperties.getInt("persist.sys.phh.sim_slots", -1);
-+        if (simSlots == 0 || simSlots == 1) {
-+            return MultiSimVariants.UNKNOWN;
-+        } else if (simSlots == 2) {
-+            return MultiSimVariants.DSDS;
-+        } else if (simSlots == 3) {
-+            return MultiSimVariants.TSTS;
-+        }
-+
-         String mSimConfig =
-                 TelephonyProperties.multi_sim_config().orElse("");
-         if (mSimConfig.equals("dsds")) {
-@@ -689,6 +698,11 @@ public class TelephonyManager {
+@@ -665,6 +665,10 @@ public class TelephonyManager {
       * </ul>
       */
      public int getActiveModemCount() {
@@ -43,11 +29,10 @@ index 0e7f8400b..c30bc065c 100644
 +        if (simSlots >= 0) {
 +            return simSlots;
 +        }
-+
-         int modemCount = 1;
-         switch (getMultiSimConfiguration()) {
-             case UNKNOWN:
-@@ -717,6 +731,11 @@ public class TelephonyManager {
+         if (!isDeviceVoiceCapable() && !isDeviceSmsCapable() && !isDataCapable()) return 0;
+ 
+         return switch(TelephonyProperties.multi_sim_config().orElse("").toLowerCase(Locale.ROOT)) {
+@@ -682,6 +686,10 @@ public class TelephonyManager {
       * {@link #getActiveModemCount} returns 1 while this API returns 2.
       */
      public int getSupportedModemCount() {
@@ -55,10 +40,9 @@ index 0e7f8400b..c30bc065c 100644
 +        if (simSlots >= 0) {
 +            return simSlots;
 +        }
-+
          return TelephonyProperties.max_active_modems().orElse(getActiveModemCount());
      }
-
+ 
 -- 
 2.53.0
 
