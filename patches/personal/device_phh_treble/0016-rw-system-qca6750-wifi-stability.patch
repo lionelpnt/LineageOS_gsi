@@ -1,0 +1,33 @@
+From 4f77b5a188eec6a61d654ec0e01a547de05878c1 Mon Sep 17 00:00:00 2001
+From: lionelpnt <lionelpnt@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 22:33:14 +0100
+Subject: [PATCH] rw-system: stabilize QCA6750 WCNSS_qcom_cfg.ini on iPlay 70
+ mini Ultra
+
+---
+ rw-system.sh | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/rw-system.sh b/rw-system.sh
+index 8ca3209..9207b8d 100644
+--- a/rw-system.sh
++++ b/rw-system.sh
+@@ -1341,3 +1341,15 @@ if grep -q '^mremap: arg3 == 3$' /vendor/etc/seccomp_policy/samsung.software.med
+     chcon -h u:object_r:vendor_configs_file:s0 /vendor/etc/seccomp_policy/samsung.software.media.c2-base-policy
+     chmod 644 /vendor/etc/seccomp_policy/samsung.software.media.c2-base-policy
+ fi
++
++# Stabilize QCA6750 Wi-Fi on ALLDOCUBE iPlay 70 Mini Ultra against firmware hang/reboot
++if [ -f /vendor/etc/wifi/qca6750/WCNSS_qcom_cfg.ini ] && getprop ro.product.vendor.model | grep -qi "iPlay 70 mini Ultra"; then
++    cp /vendor/etc/wifi/qca6750/WCNSS_qcom_cfg.ini /mnt/phh/qca6750_WCNSS_qcom_cfg.ini
++    sed -i -e 's/^gDot11Mode=0$/gDot11Mode=9/' \
++           -e 's/^bcast_twt=1$/bcast_twt=0/' \
++           -e 's/^gRuntimePM=2$/gRuntimePM=0/' \
++           -e 's/^gEnableSWLM=1$/gEnableSWLM=0/' /mnt/phh/qca6750_WCNSS_qcom_cfg.ini
++    mount -o bind /mnt/phh/qca6750_WCNSS_qcom_cfg.ini /vendor/etc/wifi/qca6750/WCNSS_qcom_cfg.ini
++    chcon -h u:object_r:vendor_configs_file:s0 /vendor/etc/wifi/qca6750/WCNSS_qcom_cfg.ini
++    chmod 644 /vendor/etc/wifi/qca6750/WCNSS_qcom_cfg.ini
++fi
+-- 
+2.53.0
+
